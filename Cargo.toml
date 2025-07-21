@@ -1,0 +1,22 @@
+[package]
+name = "chill-json"
+description = "At times JSON is enclosed in surrounding text and often created by tools like LLMs  or humans with no strict adherence to formatting. JSON is often not complete or incorrect or commas are missing or braces are there. The rule bound JSON parsers are not helpful in extracting `whatever is possible` from the given input. This lib extract whatever is possible in failsafe manner. It fails only when there are multiple independent JSON structures in the input."
+authors = ["Ravinder Payal<ravinderpayal@hewto.ai>"]
+license = "MIT OR Apache-2.0"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+anyhow = "1.0"
+serde_json5 = "0.2.1"
+serde_json = "1.0.140"
+
+
+
+[dev-dependencies]
+criterion = { version = "0.6" }
+
+
+
