@@ -19,3 +19,33 @@ Extracting data from sources where strict JSON compliance cannot be guaranteed.
 
 # Why Use This Library?
 If traditional JSON parsers stop at the first mistake, this library aims to "make the best of what you have"—enabling you to keep moving forward with whatever data can be extracted. Perfect for developers and data wranglers who value resilience and flexibility in their text processing pipelines.
+
+
+
+# Tests results
+```
+running 21 tests
+test fuzzy_json_tests::test_builder_pattern ... ok
+test fuzzy_json_tests::test_basic_parsing ... ok
+test fuzzy_json_tests::test_code_block_markers ... ok
+test fuzzy_json_tests::test_single_quotes ... ok
+test fuzzy_json_tests::test_trailing_comma ... ok
+test fuzzy_json_tests::test_mixed_quotes ... ok
+test fuzzy_json_tests::test_truncated_after_colon ... ok
+test fuzzy_json_tests::test_truncated_array ... ok
+test fuzzy_json_tests::test_truncated_object ... ok
+test fuzzy_json_tests::test_truncated_array_with_trailing_comma ... ok
+test fuzzy_json_tests::test_mixed_truncation_scenarios ... ok
+test fuzzy_json_tests::test_truncated_incomplete_property ... ok
+test fuzzy_json_tests::test_truncated_string ... ok
+test fuzzy_json_tests::test_truncated_with_complete_str_value_at_end ... ok
+test fuzzy_json_tests::test_truncated_with_incomplete_str_value_at_end ... ok
+test fuzzy_json_tests::test_truncated_with_incomplete_number_property_at_end ... ok
+test fuzzy_json_tests::test_truncated_with_code_blocks ... ok
+test fuzzy_json_tests::test_truncated_nested ... ok
+test fuzzy_json_tests::test_json_locked_in_json_code_formating ... ok
+test fuzzy_json_tests::test_json_having_arbitrary_text_in_beginning ... ok
+test fuzzy_json_tests::test_json_having_arbitrary_text_at_the_end ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+```

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod fuzzy_json_tests {
-    use fuzzy_json::{FuzzyJsonParser, FuzzyJsonParserBuilder};
+    use chill_json::{FuzzyJsonParser, FuzzyJsonParserBuilder};
     use serde_json::json;
 
     #[test]
