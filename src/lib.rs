@@ -490,11 +490,11 @@ impl FuzzyJsonParser {
         state: &mut ParseState,
         error: &str,
     ) -> Result<bool, FuzzyJsonError> {
-        println!("COntext: {:?} | Is key: {:?}", state.current_context(), state.is_prop());
+        // println!("COntext: {:?} | Is key: {:?}", state.current_context(), state.is_prop());
         for strategy in &self.repair_strategies {
             if strategy.can_repair(state, error) {
-                #[cfg(debug_assertions)]
-                println!("Repaired using {:?} | output: {}", strategy, state.output);
+                // #[cfg(debug_assertions)]
+                // println!("Repaired using {:?} | output: {}", strategy, state.output);
                 strategy.repair(state, error)?;
                 return Ok(true);
             }
@@ -1034,7 +1034,7 @@ impl StateHandler for ColonHandler {
         // for the cases when json stopped at colon itself
 
 
-        println!("\n COLON: \n Remaining at colon handler check: {} | Context: {:?}", state.remaining(), state.current_context());
+        // println!("\n COLON: \n Remaining at colon handler check: {} | Context: {:?}", state.remaining(), state.current_context());
         if state.is_prop() {
             state.pop_context();
             state.push_context(JsonContext::Colon);
@@ -1073,7 +1073,7 @@ pub struct LiteralHandler;
 impl StateHandler for LiteralHandler {
     fn can_handle(&self, state: &ParseState) -> bool {
         let remaining = state.remaining().trim();
-        println!("\n \n Remaining at literal handler check: {} | Context: {:?}", remaining, state.current_context());
+        // println!("\n \n Remaining at literal handler check: {} | Context: {:?}", remaining, state.current_context());
         (state.current_context() == &JsonContext::Array
             || state.current_context() == &JsonContext::Colon
             || state.current_context().is_key())
@@ -1123,11 +1123,12 @@ impl StateHandler for NoQuotesKeyHandler {
     }
 
     fn handle(&self, state: &mut ParseState) -> Result<bool, FuzzyJsonError> {
+        /*
         println!(
             "The mother fucker no quote inttervened at: {:?}  \n| {}",
             state.output,
             state.remaining()
-        );
+        );*/
         state.push_context(JsonContext::DoubleQuoteProperty);
         state.output.push('"');
 
@@ -1138,6 +1139,7 @@ impl StateHandler for NoQuotesKeyHandler {
                 state.output.push(ch);
                 state.advance(1);
             } else {
+                state.output.push('"');
                 break;
             }
         }
@@ -1158,12 +1160,14 @@ impl StateHandler for StringHandler {
     }
 
     fn handle(&self, state: &mut ParseState) -> Result<bool, FuzzyJsonError> {
+        /*
         println!(
+
             "{:?} | At the beginning of string handler: {}  | Output so far: {}",
             state.current_context(),
             state.remaining(),
             state.output
-        );
+        );*/
         let boundary_char = state.current_char().unwrap(); // because this would be
         // called only if there
         // exists a current char
@@ -1181,11 +1185,12 @@ impl StateHandler for StringHandler {
         } else if state.is_prop() {
             // what if the colon is already there in json and it could be the next char itself
             //
+            /*
             println!(
                 "the fuck is going on here with this much remaining(something definitely seems wrong here): {}  | Output so far: {}",
                 state.remaining(),
                 state.output
-            );
+            );*/
             // state.output.push(':');
             /*
             state.pop_context();
