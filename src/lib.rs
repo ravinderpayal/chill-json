@@ -17,9 +17,21 @@ pub enum JsonContext {
     Root,
     Object,
     Array,
-    Property,
-    Value,
+    DoubleQuoteProperty,
+    SingleQuoteProperty,
+    DoubleQuoteValue,
+    SingleQuoteValue,
     Colon,
+}
+
+impl JsonContext {
+    pub fn is_value(&self) -> bool {
+        self == &Self::DoubleQuoteValue || self == &Self::SingleQuoteValue
+    }
+
+    pub fn is_key(&self) -> bool {
+        self == &Self::DoubleQuoteProperty || self == &Self::SingleQuoteProperty
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +76,36 @@ impl ParseState {
             Some(start_byte) => &self.input[start_byte..],
             None => "",
         }
+    }
+
+    pub fn is_sq_key_or_value(&self) -> bool {
+        let cc = self.current_context();
+
+        cc == &JsonContext::SingleQuoteValue || cc == &JsonContext::SingleQuoteProperty
+    }
+    pub fn is_key_or_value(&self) -> bool {
+        let cc = self.current_context();
+
+        cc == &JsonContext::SingleQuoteValue
+            || cc == &JsonContext::DoubleQuoteValue
+            || cc == &JsonContext::SingleQuoteProperty
+            || cc == &JsonContext::DoubleQuoteProperty
+    }
+
+    pub fn is_dq_key_or_value(&self) -> bool {
+        let cc = self.current_context();
+
+        cc == &JsonContext::DoubleQuoteValue || cc == &JsonContext::DoubleQuoteProperty
+    }
+
+    pub fn is_value(&self) -> bool {
+        let cc = self.current_context();
+        cc == &JsonContext::SingleQuoteValue || cc == &JsonContext::DoubleQuoteValue
+    }
+
+    pub fn is_prop(&self) -> bool {
+        let cc = self.current_context();
+        cc == &JsonContext::SingleQuoteProperty || cc == &JsonContext::DoubleQuoteProperty
     }
 
     pub fn is_finished(&self) -> bool {
@@ -448,10 +490,11 @@ impl FuzzyJsonParser {
         state: &mut ParseState,
         error: &str,
     ) -> Result<bool, FuzzyJsonError> {
+        println!("COntext: {:?} | Is key: {:?}", state.current_context(), state.is_prop());
         for strategy in &self.repair_strategies {
             if strategy.can_repair(state, error) {
-                // #[cfg(debug_assertions)]
-                // println!("Repaired using {:?}", strategy);
+                #[cfg(debug_assertions)]
+                println!("Repaired using {:?} | output: {}", strategy, state.output);
                 strategy.repair(state, error)?;
                 return Ok(true);
             }
@@ -481,6 +524,7 @@ impl FuzzyJsonParser {
         self.register_handler(Box::new(NumberHandler));
         self.register_handler(Box::new(ObjectHandler));
         self.register_handler(Box::new(ArrayHandler));
+        self.register_handler(Box::new(NoQuotesKeyHandler));
     }
 }
 
@@ -519,6 +563,7 @@ impl RepairStrategy for TrailingCommaStrategy {
 #[derive(Debug)]
 pub struct MissingQuotesStrategy;
 
+// it only works for property keys and not for values
 impl RepairStrategy for MissingQuotesStrategy {
     fn name(&self) -> &'static str {
         "missing_quotes"
@@ -529,12 +574,19 @@ impl RepairStrategy for MissingQuotesStrategy {
 
     fn can_repair(&self, state: &ParseState, error: &str) -> bool {
         error.contains("expected") && error.contains("quote")
-            || (state.current_context() == &JsonContext::Property
+            || (state.current_context() == &JsonContext::DoubleQuoteProperty
                 && state.current_char().map_or(false, |c| c.is_alphabetic()))
     }
 
     fn repair(&self, state: &mut ParseState, _error: &str) -> Result<(), FuzzyJsonError> {
-        state.output.push('"');
+        println!("Repairing missing quotes");
+        state.output.push(
+            if state.current_context() == &JsonContext::SingleQuoteProperty {
+                '\''
+            } else {
+                '"'
+            },
+        );
 
         // Collect until we hit a delimiter
         while let Some(ch) = state.current_char() {
@@ -545,7 +597,13 @@ impl RepairStrategy for MissingQuotesStrategy {
             state.advance(1);
         }
 
-        state.output.push('"');
+        state.output.push(
+            if state.current_context() == &JsonContext::SingleQuoteProperty {
+                '\''
+            } else {
+                '"'
+            },
+        );
         Ok(())
     }
 }
@@ -739,12 +797,13 @@ impl TruncationRepairStrategy {
             match context {
                 JsonContext::Object => needs_closing.push('}'),
                 JsonContext::Array => needs_closing.push(']'),
-                JsonContext::Property => {
+                JsonContext::DoubleQuoteProperty |JsonContext::SingleQuoteProperty => {
                     // We might be in the middle of a property name or value
                     //
                     if state.output.chars().last() != Some('"')
                         && state.output.matches('"').count() % 2 != 0
                     {
+                        println!("maybe the root cause @ 805");
                         needs_closing.push('"'); // Close unclosed string
                     }
                     // needs_closing.push('"'); // Close any unclosed string
@@ -755,7 +814,7 @@ impl TruncationRepairStrategy {
                 JsonContext::Colon => {
                     needs_closing.push('0'); // set 0/empty
                 }
-                JsonContext::Value => {
+                JsonContext::DoubleQuoteValue => {
                     // We might be in the middle of a value
                     if state.output.chars().last() == Some('"')
                         && state.output.matches('"').count() % 2 != 0
@@ -944,10 +1003,11 @@ impl StateHandler for CommaHandler {
                 }
                 remaining = state.remaining();
             }
-            // not an idiomatic way, should have returned at this point
+            
+            // not an idiomatic way from first look, ideally it should have returned at this point
             // so that object handler could have taken over
-            // this introduced redundant code
-            // [todo]:
+            // but this is to handle a space case where comma is followed by closing curly brace,
+            // as per json the stray comma is a syntax error
             if state.current_char() == Some('}') {
                 state.output.push('}');
                 state.advance(1);
@@ -973,14 +1033,16 @@ impl StateHandler for ColonHandler {
         // there should be a colon state as well
         // for the cases when json stopped at colon itself
 
-        if state.current_context() == &JsonContext::Property {
+
+        println!("\n COLON: \n Remaining at colon handler check: {} | Context: {:?}", state.remaining(), state.current_context());
+        if state.is_prop() {
             state.pop_context();
             state.push_context(JsonContext::Colon);
         }
 
         let remaining = state.remaining();
         if remaining.starts_with(":") {
-            state.output.push_str(":");
+            state.output.push(':');
             state.advance(1);
         }
         while state.current_char().map_or(false, |a| a.is_whitespace())
@@ -992,13 +1054,14 @@ impl StateHandler for ColonHandler {
                 state.advance(1);
             }
         }
+        /*
         // not a right approach to add repair code in json handler
         // should be moved to repair strategies
         if state.current_char() == Some('}') {
             state.output.push_str("null");
             // state.advance(1);
             state.pop_context(); // colon context popped
-        }
+        }*/
 
         Ok(true)
     }
@@ -1009,10 +1072,11 @@ pub struct LiteralHandler;
 
 impl StateHandler for LiteralHandler {
     fn can_handle(&self, state: &ParseState) -> bool {
-        let remaining = state.remaining();
+        let remaining = state.remaining().trim();
+        println!("\n \n Remaining at literal handler check: {} | Context: {:?}", remaining, state.current_context());
         (state.current_context() == &JsonContext::Array
             || state.current_context() == &JsonContext::Colon
-            || state.current_context() == &JsonContext::Property)
+            || state.current_context().is_key())
             && (remaining.starts_with("true")
                 || remaining.starts_with("false")
                 || remaining.starts_with("null"))
@@ -1040,33 +1104,112 @@ impl StateHandler for LiteralHandler {
     }
 }
 
+const VALID_KEY_FIRST_CHARS: [char; 27] = [
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+    't', 'u', 'v', 'w', 'x', 'y', 'z', '_',
+];
+const VALID_KEY_REST_OF_CHARS: [char; 10] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+
+#[derive(Debug)]
+pub struct NoQuotesKeyHandler;
+
+impl StateHandler for NoQuotesKeyHandler {
+    fn can_handle(&self, state: &ParseState) -> bool {
+        (state.current_context() == &JsonContext::Object)
+            && (state
+                .current_char()
+                .map(|c| VALID_KEY_FIRST_CHARS.contains(&c.to_ascii_lowercase()))
+                == Some(true))
+    }
+
+    fn handle(&self, state: &mut ParseState) -> Result<bool, FuzzyJsonError> {
+        println!(
+            "The mother fucker no quote inttervened at: {:?}  \n| {}",
+            state.output,
+            state.remaining()
+        );
+        state.push_context(JsonContext::DoubleQuoteProperty);
+        state.output.push('"');
+
+        while let Some(ch) = state.current_char() {
+            if VALID_KEY_FIRST_CHARS.contains(&ch.to_ascii_lowercase())
+                || VALID_KEY_REST_OF_CHARS.contains(&ch)
+            {
+                state.output.push(ch);
+                state.advance(1);
+            } else {
+                break;
+            }
+        }
+
+        Ok(true)
+    }
+}
+
 #[derive(Debug)]
 pub struct StringHandler;
 
 impl StateHandler for StringHandler {
     fn can_handle(&self, state: &ParseState) -> bool {
-        state.current_char() == Some('"')
+        (state.is_sq_key_or_value() && state.current_char() == Some('\''))
+            || (state.is_dq_key_or_value() && state.current_char() == Some('"'))
+            || (!state.is_key_or_value()
+                && (state.current_char() == Some('"') || state.current_char() == Some('\'')))
     }
 
     fn handle(&self, state: &mut ParseState) -> Result<bool, FuzzyJsonError> {
+        println!(
+            "{:?} | At the beginning of string handler: {}  | Output so far: {}",
+            state.current_context(),
+            state.remaining(),
+            state.output
+        );
+        let boundary_char = state.current_char().unwrap(); // because this would be
+        // called only if there
+        // exists a current char
+
         state.output.push('"');
         state.advance(1);
 
         if state.current_context() == &JsonContext::Colon {
             state.pop_context();
-            state.push_context(JsonContext::Value);
-        } else if state.current_context() == &JsonContext::Property {
-            state.output.push(':');
+            state.push_context(if boundary_char == '"' {
+                JsonContext::DoubleQuoteValue
+            } else {
+                JsonContext::SingleQuoteValue
+            });
+        } else if state.is_prop() {
+            // what if the colon is already there in json and it could be the next char itself
+            //
+            println!(
+                "the fuck is going on here with this much remaining(something definitely seems wrong here): {}  | Output so far: {}",
+                state.remaining(),
+                state.output
+            );
+            // state.output.push(':');
+            /*
             state.pop_context();
-            state.push_context(JsonContext::Value);
+            state.push_context(if boundary_char == '"' {
+                JsonContext::DoubleQuoteValue
+            } else {
+                JsonContext::SingleQuoteValue
+            });*/
         } else if state.current_context() == &JsonContext::Array {
-            state.push_context(JsonContext::Value);
+            state.push_context(if boundary_char == '"' {
+                JsonContext::DoubleQuoteValue
+            } else {
+                JsonContext::SingleQuoteValue
+            });
         } else {
-            state.push_context(JsonContext::Property);
+            state.push_context(if boundary_char == '"' {
+                JsonContext::DoubleQuoteProperty
+            } else {
+                JsonContext::SingleQuoteProperty
+            });
         }
 
         while let Some(ch) = state.current_char() {
-            if ch == '"' {
+            if ch == boundary_char {
                 state.output.push('"');
                 state.advance(1);
                 /*
@@ -1076,7 +1219,7 @@ impl StateHandler for StringHandler {
                     state.remaining().chars().nth(0),
                     state.current_char()
                 );*/
-                if state.current_context() == &JsonContext::Value {
+                if state.is_value() {
                     state.pop_context();
                 }
                 break;
@@ -1112,15 +1255,15 @@ impl StateHandler for NumberHandler {
     fn handle(&self, state: &mut ParseState) -> Result<bool, FuzzyJsonError> {
         if state.current_context() == &JsonContext::Colon {
             state.pop_context();
-            state.push_context(JsonContext::Value);
-        } else if state.current_context() == &JsonContext::Property {
+            state.push_context(JsonContext::DoubleQuoteValue);
+        } else if state.current_context() == &JsonContext::DoubleQuoteProperty {
             state.pop_context();
-            state.push_context(JsonContext::Value);
+            state.push_context(JsonContext::DoubleQuoteValue);
             state.output.push(':');
         } else if state.current_context() == &JsonContext::Array {
-            state.push_context(JsonContext::Value);
+            state.push_context(JsonContext::DoubleQuoteValue);
         } else {
-            state.push_context(JsonContext::Property);
+            state.push_context(JsonContext::DoubleQuoteProperty);
             state.output.push('"');
         }
 
@@ -1134,9 +1277,9 @@ impl StateHandler for NumberHandler {
             }
         }
 
-        if state.current_context() == &JsonContext::Value {
+        if state.current_context() == &JsonContext::DoubleQuoteValue {
             state.pop_context();
-        } else if state.current_context() == &JsonContext::Property
+        } else if state.current_context() == &JsonContext::DoubleQuoteProperty
             && state
                 .current_char()
                 .map_or(true, |c| c.is_whitespace() || c == ':' || c == '}')

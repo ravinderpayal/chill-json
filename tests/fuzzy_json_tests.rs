@@ -56,6 +56,19 @@ mod fuzzy_json_tests {
         assert_eq!(result, json!({"name": "test"}));
     }
 
+
+    #[test]
+    fn test_builder_pattern_2() {
+        let parser = FuzzyJsonParserBuilder::new()
+            .with_trailing_commas(true)
+            .with_single_quotes(true)
+            .strict_mode(false)
+            .build();
+
+        let result: serde_json::Value = parser.parse(r#"{"name": "test",}"#).unwrap();
+        assert_eq!(result, json!({"name": "test"}));
+    }
+
     #[test]
     fn test_truncated_string() {
         let parser = FuzzyJsonParser::new();
@@ -259,6 +272,41 @@ mod fuzzy_json_tests {
         let json_str = "Here's your json response for Band & Company ```json\n{\n\"is_global\": true,\n\"about_summary\": \"Bain & Company is a global management consulting firm that advises public, private, and nonprofit organizations on critical issues. Their specialties include corporate strategy, mergers & acquisitions, private equity, digital transformation, operations, customer experience, organizational effectiveness, and sustainability.\",\n\"size\": \"large\",\n\"is_publicly_listed\": false,\n\"last_year_revenue\": 6300000000,\n\"latest_head_count\": 19000,\n\"inception_year\": 1973,\n\"legal_name\": \"BAIN & COMPANY, INC.\",\n\"past_names\": [\"SUNAPEE SECURITIES, INC.\", \"BAIN & COMPANY, INC. UNITED KINGDOM\"],\n\"headquarter\": \"Boston, Massachusetts, U.S.\",\n\"office_locations\": [\"Boston\", \"New York\", \"London\", \"Paris\", \"Munich\", \"Tokyo\", \"Shanghai\", \"Sydney\", \"Singapore\", \"Dubai\", \"Johannesburg\", \"Chicago\", \"San Francisco\", \"Atlanta\", \"Dallas\", \"Houston\", \"Los Angeles\", \"Seattle\", \"Toronto\", \"Mexico City\", \"São Paulo\", \"Buenos Aires\", \"Copenhagen\", \"Frankfurt\", \"Helsinki\", \"Istanbul\", \"Madrid\", \"Milan\", \"Oslo\", \"Rome\", \"Stockholm\", \"Vienna\", \"Warsaw\", \"Zurich\", \"Beijing\", \"Bengaluru\", \"Ho Chi Minh City\", \"Hong Kong\", \"Jakarta\", \"Kuala Lumpur\", \"Manila\", \"Melbourne\", \"Mumbai\", \"New Delhi\", \"Perth\", \"Seoul\", \"Washington, DC\", \"Austin\", \"Denver\", \"Minneapolis\", \"Monterrey\", \"Montreal\", \"Rio de Janeiro\", \"Santiago\", \"Silicon Valley\", \"Bogota\", \"Athens\", \"Berlin\", \"Brussels\", \"Kyiv\", \"Doha\", \"Riyadh\"],\n\"industry\": \"Management Consulting\",\n\"sector\": \"Professional Services\",\n\"sub_sector\": \"Strategy and Management Consulting\",\n\"website\": \"www.bain.com\",\n\"is_b2b\": true,\n\"is_b2c\": false,\n\"is_product_company\": false,\n\"is_services_company\": true\n}}\n``` Can I help you with something else as well?";
         let result: serde_json::Value = parser.parse(json_str).unwrap();
         assert_eq!(result["legal_name"], "BAIN & COMPANY, INC.");
+        // assert_eq!(result["type"], "company");
+        // assert_eq!(result["founded"], 2015);
+    }
+
+    // #[test]
+    fn test_json_having_arbitrary_wrapper_1() {
+        let parser = FuzzyJsonParser::new();
+
+        // LLM response with code blocks that gets truncated
+        let json_str = "```json\n{\n  \"is_global\": false,\n  \"about_summary\": \"\",\n  \"\"size\"\": null,\n  \"is_publicly_listed\": false,\n  \"last_year_revenue\": null,\n  \"latest_head_count\": null,\n  \"inception_year\": null,\n  \"legal_name\": \"Biz4Group LLC\",\n  \"past_names\": [],\n  \"headquarter\": \"\",\n  \"office_locations\": [],\n  \"industry\": \"\",\n  \"sector\": \"\",\n  \"sub_sector\": \"\",\n  \"website\": \"\",\n  \"is_b2b\": false,\n  \"is_b2c\": false,\n  \"is_product_company\": false,\n  \"is_services_company\": false\n}\n```";
+        let result: serde_json::Value = parser.parse(json_str).unwrap();
+        assert_eq!(result["legal_name"], "Biz4Group LLC");
+        // assert_eq!(result["type"], "company");
+        // assert_eq!(result["founded"], 2015);
+    }
+
+    //#[test]
+    fn test_json_having_arbitrary_wrapper_2() {
+        let parser = FuzzyJsonParser::new();
+
+        // LLM response with code blocks that gets truncated
+        let json_str = "```json\n{\n  \"is_global\": false,\n  \"about_summary\": \"\",\n  \"size\": \"small\",\n  \"is_publicly_listed\": false,\n  \"last_year_revenue\": undefined,\n  \"latest_head_count\": undefined,\n  \"inception_year\": undefined,\n  \"legal_name\": \"BIO PETROCLEAN INDIA\",\n  \"past_names\": [],\n  \"headquarter\": \"\",\n  \"office_locations\": [],\n  \"industry\": \"\",\n  \"sector\": \"\",\n  \"sub_sector\": \"\",\n  \"website\": \"\",\n  \"is_b2b\": false,\n  \"is_b2c\": false,\n  \"is_product_company\": false,\n  \"is_services_company\": false\n}\n```";
+        let result: serde_json::Value = parser.parse(json_str).unwrap();
+        assert_eq!(result["legal_name"], "Biz4Group LLC");
+        // assert_eq!(result["type"], "company");
+        // assert_eq!(result["founded"], 2015);
+    }
+    #[test]
+    fn test_json_having_arbitrary_wrapper_3() {
+        let parser = FuzzyJsonParser::new();
+
+        // LLM response with code blocks that gets truncated
+        let json_str = "```{is_global: true, about_summary: 'PricewaterhouseCoopers, Ernst & Young, and KPMG are multinational professional services firms providing audit, tax, and consulting services.', size: 'large', is_publicly_listed: false, industry: 'Professional Services', sector: 'Accounting', sub_sector: 'Audit & Assurance', website: 'https://www.pwc.com; https://www.ey.com; https://home.kpmg/xx/en/home.html', is_b2b: true, is_b2c: false, is_product_company: false, is_services_company: true}```";
+        let result: serde_json::Value = parser.parse(json_str).unwrap();
+        assert_eq!(result["is_global"], true);
         // assert_eq!(result["type"], "company");
         // assert_eq!(result["founded"], 2015);
     }
