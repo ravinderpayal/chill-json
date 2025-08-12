@@ -310,4 +310,17 @@ mod fuzzy_json_tests {
         // assert_eq!(result["type"], "company");
         // assert_eq!(result["founded"], 2015);
     }
+
+
+    #[test]
+    fn test_json_having_arbitrary_wrapper_4() {
+        let parser = FuzzyJsonParser::new();
+
+        // LLM response with code blocks that gets truncated
+        let json_str = "```{is_global: false, about_summary: 'Satya Aesthetics specializes in aesthetics treatments and beauty services.', size: 'small', is_publicly_listed: false, last_year_revenue: undefined, latest_head_count: undefined, inception_year: undefined, legal_name: undefined, past_names: [], headquarter: 'Local', office_locations: ['Local'], industry: 'Aesthetics', sector: 'Health & Wellness', sub_sector: 'Beauty Services', website: 'https://satyaaesthetics.com', is_b2b: false, is_b2c: true, is_product_company: false, is_services_company: true}```";
+        let result: serde_json::Value = parser.parse(json_str).unwrap();
+        assert_eq!(result["is_global"], false);
+        // assert_eq!(result["type"], "company");
+        // assert_eq!(result["founded"], 2015);
+    }
 }

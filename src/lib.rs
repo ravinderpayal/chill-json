@@ -1079,7 +1079,8 @@ impl StateHandler for LiteralHandler {
             || state.current_context().is_key())
             && (remaining.starts_with("true")
                 || remaining.starts_with("false")
-                || remaining.starts_with("null"))
+                || remaining.starts_with("null")
+                || remaining.starts_with("undefined"))
     }
 
     fn handle(&self, state: &mut ParseState) -> Result<bool, FuzzyJsonError> {
@@ -1094,6 +1095,10 @@ impl StateHandler for LiteralHandler {
         } else if remaining.starts_with("null") {
             state.output.push_str("null");
             state.advance(4);
+        }
+        else if remaining.starts_with("undefined") {
+            state.output.push_str("null");
+            state.advance(9);
         }
         if state.current_context() != &JsonContext::Array {
             state.pop_context(); // if not array it would be a property or colon // what about
